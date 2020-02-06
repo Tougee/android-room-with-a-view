@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
  * The fact that this has very few comments emphasizes its coolness.  In a real
  * app, consider exporting the schema to help you with migrations.
  */
-@Database(entities = [Word::class], version = 1, exportSchema = false)
+@Database(entities = [Word::class, WorldFts::class], version = 1, exportSchema = false)
 abstract class WordRoomDatabase : RoomDatabase() {
 
     abstract fun wordDao(): WordDao
@@ -38,6 +38,7 @@ abstract class WordRoomDatabase : RoomDatabase() {
     companion object {
         @Volatile
         private var INSTANCE: WordRoomDatabase? = null
+        private var OTHER_INSTANCE: WordRoomDatabase? = null
 
         fun getDatabase(
                 context: Context,
@@ -51,9 +52,30 @@ abstract class WordRoomDatabase : RoomDatabase() {
                         WordRoomDatabase::class.java,
                         "word_database"
                 )
-                        .addCallback(WordDatabaseCallback(scope))
-                        .build()
+                    .enableMultiInstanceInvalidation()
+                    .addCallback(WordDatabaseCallback(scope))
+                    .build()
                 INSTANCE = instance
+                // return instance
+                instance
+            }
+        }
+
+        fun getOtherDatabase(
+            context: Context,
+            scope: CoroutineScope
+        ): WordRoomDatabase {
+            // if the INSTANCE is not null, then return it,
+            // if it is, then create the database
+            return OTHER_INSTANCE ?: synchronized(this) {
+                val instance = Room.databaseBuilder(
+                    context.applicationContext,
+                    WordRoomDatabase::class.java,
+                    "word_database"
+                )
+                    .enableMultiInstanceInvalidation()
+                    .build()
+                OTHER_INSTANCE = instance
                 // return instance
                 instance
             }
